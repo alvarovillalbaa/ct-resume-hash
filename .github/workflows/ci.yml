@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CMake build and tests
+        run: |
+          cmake -S . -B build -DCT_RESUME_HASH_USE_CT=ON
+          cmake --build build --config Release
+          ctest --test-dir build --output-on-failure
+
+      - name: Python binding smoke
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          pip install ./bindings/python
+          python - <<'PY'
+import ct_resume_hash
+digest = ct_resume_hash.hash_once("resume text")
+assert isinstance(digest, (bytes, bytearray)) and len(digest) == 32
+print("python binding ok")
+PY
+
+      - name: Rust binding tests
+        run: |
+          cd bindings/rust
+          cargo test -q
+
